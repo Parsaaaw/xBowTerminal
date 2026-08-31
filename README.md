@@ -58,7 +58,7 @@ xbow/
 - [Tauri prerequisites for Windows](https://tauri.app/start/prerequisites/) (Microsoft C++ Build Tools + WebView2, which ships with Windows 10/11 by default)
 - [Tauri CLI](https://tauri.app/reference/cli/):
   ```bash
-  cargo install tauri-cli
+  cargo install tauri-cli --version "^2"
   ```
 
 ### Run in development
