@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "xBow",
+  "version": "1.0.0",
+  "identifier": "com.xbow.app",
+  "build": {
+    "frontendDist": "../renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "xBow",
+        "width": 1000,
+        "height": 640,
+        "decorations": false,
+        "transparent": false,
+        "backgroundColor": "#0b0c14",
+        "visible": false,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/xbow-icon.png"]
+  }
+}

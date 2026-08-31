@@ -1,0 +1,635 @@
+/* Fallback values so the window still looks right for one frame before
+   renderer.js's applyChrome() overwrites these with the active theme
+   (these fallbacks match the "dark" theme). */
+:root {
+  --bg-0: #0b0c14;
+  --bg-1: #111219;
+  --bg-2: #15161f;
+  --bg-3: #14151f;
+  --text-1: #f1f1f1;
+  --text-2: #c5c8d6;
+  --text-3: #9a9db3;
+  --text-4: #7f849c;
+  --border-1: #22232f;
+  --border-2: #2a2b3a;
+  --border-3: #4a4b5a;
+  --accent: #4aa3e0;
+  --accent-hover: #5cb3f0;
+  --accent-text: #0b0c14;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; background: var(--bg-0); color: var(--text-2);
+  font-family: -apple-system, "Segoe UI", sans-serif; overflow: hidden;
+}
+#titlebar {
+  height: 34px; display: flex; align-items: center; padding: 0 10px;
+  background: var(--bg-2); -webkit-app-region: drag; border-bottom: 1px solid var(--border-1);
+}
+#traffic-lights { display: flex; gap: 8px; -webkit-app-region: no-drag; }
+.light { width: 12px; height: 12px; border-radius: 50%; border: none; cursor: pointer; padding: 0; }
+.light.red { background: #ff5f57; }
+.light.yellow { background: #febc2e; }
+.light.green { background: #28c840; }
+#titlebar-text { flex: 1; text-align: center; font-size: 12px; color: var(--text-3); }
+
+#btn-settings {
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 14px;
+  width: 34px;
+  height: 24px;
+  line-height: 24px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+#btn-settings:hover { background: var(--border-1); color: var(--text-1); }
+
+#btn-focus {
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-right: 2px;
+}
+#btn-focus:hover { background: var(--border-1); color: var(--text-1); }
+#btn-focus.active { color: var(--accent); }
+
+/* ---------------- focus mode ---------------- */
+/* Distraction-free layout: hides the tab bar entirely and lets the active
+   terminal fill the window right below the titlebar. Tabs/panes/state are
+   untouched underneath - toggling back just restores #tabbar. */
+body.focus-mode #tabbar { display: none; }
+body.focus-mode #panes { top: 34px; }
+
+#tabbar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-1); border-bottom: 1px solid var(--border-1); padding: 0 6px;
+}
+#tabs { display: flex; }
+.tab {
+  display: flex; align-items: center; gap: 6px; padding: 7px 12px;
+  font-size: 12px; cursor: grab; color: var(--text-4); border-bottom: 2px solid transparent;
+}
+.tab.active { color: var(--text-1); background: var(--bg-0); }
+.tab.dragging { opacity: 0.4; }
+.tab .dot { width: 6px; height: 6px; border-radius: 50%; }
+.tab .close { color: var(--text-4); }
+.tab .close:hover { color: var(--text-1); }
+.tab-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-rename-input {
+  background: var(--bg-0);
+  border: 1px solid var(--accent);
+  color: var(--text-1);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 5px;
+  width: 110px;
+  cursor: text;
+}
+#new-tab-menu { display: flex; gap: 4px; }
+.new-tab-btn {
+  background: transparent; border: 1px solid var(--border-2); color: var(--text-3);
+  font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+}
+.new-tab-btn:hover { border-color: var(--border-3); color: var(--text-1); }
+
+#panes { position: absolute; top: 68px; left: 0; right: 0; bottom: 0; }
+.pane { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 6px; display: none; }
+.pane.active { display: block; }
+.pane .xterm-container { width: 100%; height: 100%; }
+
+/* A tab with no splits is just one leaf filling the whole (non-flex) .pane
+   box directly, sized with plain percentages. Once split, leaves/containers
+   become flex children instead and get their share via inline flex styles
+   set in renderer.js (see makeLeafEl/splitActivePane). */
+.pane > .split-leaf { width: 100%; height: 100%; }
+
+.split-container { display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.split-container.split-row { flex-direction: row; }
+.split-container.split-col { flex-direction: column; }
+.split-container > .split-leaf,
+.split-container > .split-container { min-width: 0; min-height: 0; }
+
+.split-leaf { position: relative; overflow: hidden; min-width: 0; min-height: 0; }
+.split-leaf .xterm-container { width: 100%; height: 100%; }
+
+/* Focus ring only makes sense once a tab actually has more than one pane -
+   updateHasSplitsClass() toggles 'has-splits' on the tab's root .pane.
+   :not(.zoomed) matters: a zoomed leaf also carries .pane-focused (see
+   zoomPane()/unzoomPane() in renderer.js, which re-focus it after moving
+   it in the DOM). Without this exclusion, this rule's z-index:1 - which
+   has higher specificity than ".split-leaf.zoomed { z-index: 10 }" below
+   - would win and drop the zoomed leaf under the split-resizer's
+   z-index:2, letting the resizer line show through on top of the
+   "fullscreen" zoomed pane instead of being fully covered by it. */
+.pane.has-splits .split-leaf.pane-focused:not(.zoomed) {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.split-leaf .pane-close-btn {
+  display: none;
+  position: absolute;
+  top: 4px; right: 4px;
+  z-index: 5;
+  width: 18px; height: 18px;
+  border: none; border-radius: 4px;
+  background: var(--bg-2);
+  color: var(--text-3);
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+}
+.pane.has-splits .split-leaf:hover .pane-close-btn { display: block; }
+.split-leaf .pane-close-btn:hover { background: var(--accent); color: var(--accent-text); }
+
+.split-resizer {
+  flex: 0 0 4px;
+  background: var(--border-1);
+  cursor: col-resize;
+  position: relative;
+  z-index: 2;
+}
+.split-container.split-col > .split-resizer { cursor: row-resize; }
+.split-resizer:hover, .split-resizer.dragging { background: var(--accent); }
+
+/* ---------------- pane zoom ---------------- */
+/* tmux/iTerm-style zoom: zoomPane()/unzoomPane() in renderer.js actually
+   move the zoomed leaf's DOM node out of the split tree onto the tab's
+   root .pane, leaving this placeholder in its old spot so the split tree
+   and every sibling's flex share stay untouched while zoomed. It never
+   needs to be seen - the zoomed leaf (z-index 10, opaque background)
+   fully covers it - it just needs to hold the right amount of space. */
+.zoom-placeholder {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Once moved onto .pane directly, this is the exact same "unsplit leaf"
+   case as ".pane > .split-leaf" below - a plain, unnested child with no
+   flex/percentage ambiguity to resolve, so the fill-the-pane sizing here
+   is always well-defined. */
+.split-leaf.zoomed {
+  position: absolute;
+  inset: 0;
+  /* Overrides the width:100%/height:100% from ".pane > .split-leaf"
+     (used for the no-split case). Without this, position:absolute plus
+     an explicit width/height *and* inset:0 is over-constrained - the
+     browser drops the inset's right/bottom and resolves width/height as
+     a percentage of the positioned ancestor's padding-box instead of its
+     content-box, so the zoomed leaf balloons out over .pane's 6px
+     padding instead of just filling it. width/height:auto lets inset:0
+     alone determine the box, matching the intended "fill .pane exactly"
+     behavior for both the split and no-split cases. */
+  width: auto;
+  height: auto;
+  z-index: 10;
+  background: var(--bg-0);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---------------- scrollback search bar ---------------- */
+
+#search-bar {
+  position: absolute;
+  top: 74px;
+  right: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+#search-input {
+  background: var(--bg-0);
+  border: 1px solid var(--border-2);
+  color: var(--text-1);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  width: 190px;
+}
+#search-count {
+  font-size: 11px;
+  color: var(--text-4);
+  min-width: 36px;
+  text-align: center;
+}
+.search-btn {
+  background: transparent;
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
+  width: 24px; height: 24px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.search-btn:hover { border-color: var(--border-3); color: var(--text-1); }
+
+/* ---------------- settings modal ---------------- */
+
+.hidden { display: none !important; }
+
+#settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+#settings-panel {
+  width: 420px;
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+#settings-panel h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-1);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+#settings-close-x {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 18px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#settings-close-x:hover { background: var(--border-1); color: var(--text-1); }
+
+/* ---- tab strip ---- */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-1);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+}
+.settings-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.settings-tab-btn:hover { color: var(--text-1); }
+.settings-tab-btn.active { background: var(--border-1); color: var(--text-1); }
+
+.settings-tab-panel { display: none; }
+.settings-tab-panel.active { display: block; }
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.settings-field select,
+.settings-field input {
+  background: var(--bg-0);
+  border: 1px solid var(--border-2);
+  color: var(--text-1);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.settings-hint {
+  font-size: 11px;
+  color: var(--text-4);
+  line-height: 1.5;
+  margin: 10px 0 16px;
+}
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.settings-btn {
+  background: transparent;
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.settings-btn:hover { border-color: var(--border-3); color: var(--text-1); }
+.settings-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.settings-btn.primary:hover { background: var(--accent-hover); }
+
+/* ---------------- themed scrollbars ---------------- */
+/* Without this, scrollable panels (the settings modal, the shortcuts list)
+   fall back to the OS/WebView default scrollbar, which on Windows renders
+   as a plain white bar that ignores the active theme entirely. */
+#settings-panel, .shortcuts-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-3) var(--bg-2);
+}
+#settings-panel::-webkit-scrollbar,
+.shortcuts-list::-webkit-scrollbar {
+  width: 10px;
+}
+#settings-panel::-webkit-scrollbar-track,
+.shortcuts-list::-webkit-scrollbar-track {
+  background: var(--bg-2);
+}
+#settings-panel::-webkit-scrollbar-thumb,
+.shortcuts-list::-webkit-scrollbar-thumb {
+  background: var(--border-3);
+  border-radius: 6px;
+  border: 2px solid var(--bg-2);
+}
+#settings-panel::-webkit-scrollbar-thumb:hover,
+.shortcuts-list::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* ---------------- theme swatch grid (Appearance tab) ---------------- */
+
+.theme-section { margin-bottom: 16px; }
+.theme-group-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-4);
+  margin-bottom: 8px;
+}
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 12px;
+}
+.theme-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+.theme-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  position: relative;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.theme-item:hover .theme-swatch { border-color: var(--border-3); }
+.theme-swatch.active { border-color: var(--accent); }
+.theme-swatch .sw-dot {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+}
+.theme-name {
+  font-size: 10px;
+  color: var(--text-3);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ---------------- font button grid (Appearance tab) ---------------- */
+
+.font-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.font-btn {
+  background: transparent;
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.font-btn:hover { border-color: var(--border-3); color: var(--text-1); }
+.font-btn.active {
+  border-color: var(--accent);
+  color: var(--text-1);
+  background: var(--border-1);
+}
+
+/* ---------------- shortcuts editor ---------------- */
+
+.settings-section {
+  border-top: 1px solid var(--border-1);
+  padding-top: 12px;
+  margin-bottom: 12px;
+}
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-1);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.settings-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.settings-link-btn:hover { color: var(--accent-hover); text-decoration: underline; }
+
+.settings-section .settings-hint { margin: 0 0 10px; }
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.shortcut-row.conflict .shortcut-key-btn {
+  border-color: #c9556f;
+  color: #ff9db0;
+}
+.shortcut-label {
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.3;
+}
+.shortcut-key-btn {
+  background: var(--bg-0);
+  border: 1px solid var(--border-2);
+  color: var(--text-1);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 118px;
+  text-align: center;
+  white-space: nowrap;
+}
+.shortcut-key-btn:hover { border-color: var(--border-3); }
+.shortcut-key-btn.listening {
+  border-color: var(--accent);
+  color: var(--accent);
+  animation: shortcut-pulse 1s ease-in-out infinite;
+}
+@keyframes shortcut-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.shortcut-reset-btn {
+  background: transparent;
+  border: 1px solid var(--border-2);
+  color: var(--text-3);
+  width: 22px; height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.shortcut-reset-btn:hover { border-color: var(--border-3); color: var(--text-1); }
+.shortcut-conflict-hint {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  color: #ff9db0;
+  margin-top: -2px;
+}
+
+/* ---------------- command palette ---------------- */
+
+#palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 60;
+}
+#palette-panel {
+  width: 480px;
+  max-width: 90vw;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+#palette-input {
+  background: var(--bg-0);
+  border: none;
+  border-bottom: 1px solid var(--border-1);
+  color: var(--text-1);
+  padding: 12px 14px;
+  font-size: 13px;
+  outline: none;
+}
+#palette-list {
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-3) var(--bg-2);
+}
+#palette-list::-webkit-scrollbar { width: 10px; }
+#palette-list::-webkit-scrollbar-track { background: var(--bg-2); }
+#palette-list::-webkit-scrollbar-thumb {
+  background: var(--border-3);
+  border-radius: 6px;
+  border: 2px solid var(--bg-2);
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.palette-item.selected { background: var(--border-1); color: var(--text-1); }
+.palette-item-hint {
+  font-size: 10.5px;
+  color: var(--text-4);
+  white-space: nowrap;
+}
+.palette-empty {
+  padding: 14px 10px;
+  font-size: 12px;
+  color: var(--text-4);
+  text-align: center;
+}

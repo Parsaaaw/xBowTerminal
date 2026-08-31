@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>xBow</title>
+<link rel="stylesheet" href="vendor/xterm.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="titlebar">
+    <div id="traffic-lights">
+      <button id="btn-close" class="light red"></button>
+      <button id="btn-min" class="light yellow"></button>
+      <button id="btn-max" class="light green"></button>
+    </div>
+    <div id="titlebar-text">xBow</div>
+    <button id="btn-focus" title="Focus mode">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+        <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+        <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+        <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+      </svg>
+    </button>
+    <button id="btn-settings" title="Settings">&#9881;</button>
+  </div>
+
+  <div id="tabbar">
+    <div id="tabs"></div>
+    <div id="new-tab-menu">
+      <button data-shell="cmd" class="new-tab-btn">+ cmd</button>
+      <button data-shell="powershell" class="new-tab-btn">+ PowerShell</button>
+      <button data-shell="wsl" class="new-tab-btn">+ WSL</button>
+    </div>
+  </div>
+
+  <div id="panes"></div>
+
+  <div id="search-bar" class="hidden">
+    <input type="text" id="search-input" placeholder="Search scrollback..." autocomplete="off" />
+    <span id="search-count"></span>
+    <button id="search-prev" class="search-btn" title="Previous (Shift+Enter)">&#8593;</button>
+    <button id="search-next" class="search-btn" title="Next (Enter)">&#8595;</button>
+    <button id="search-close" class="search-btn" title="Close (Esc)">&#10005;</button>
+  </div>
+
+  <div id="palette-overlay" class="hidden">
+    <div id="palette-panel">
+      <input type="text" id="palette-input" placeholder="Type a command…" autocomplete="off" />
+      <div id="palette-list"></div>
+    </div>
+  </div>
+
+  <div id="settings-overlay" class="hidden">
+    <div id="settings-panel">
+      <div class="settings-header">
+        <h2>settings</h2>
+        <button type="button" id="settings-close-x" title="Close">&times;</button>
+      </div>
+
+      <div class="settings-tabs">
+        <button type="button" class="settings-tab-btn" data-tab="general">General</button>
+        <button type="button" class="settings-tab-btn" data-tab="appearance">Appearance</button>
+        <button type="button" class="settings-tab-btn" data-tab="shortcuts">Shortcuts</button>
+      </div>
+
+      <div class="settings-tab-panel" data-tab-panel="general">
+        <label class="settings-field">
+          <span>Default shell</span>
+          <select id="setting-shell">
+            <option value="powershell">PowerShell</option>
+            <option value="cmd">cmd</option>
+            <option value="wsl">WSL</option>
+          </select>
+        </label>
+        <p class="settings-hint">Double-click a tab to rename it, drag tabs to reorder, and middle-click a terminal to paste from the clipboard.</p>
+      </div>
+
+      <div class="settings-tab-panel" data-tab-panel="appearance">
+        <div class="theme-section">
+          <div class="theme-group-label">Dark</div>
+          <div id="theme-grid-dark" class="theme-grid"></div>
+        </div>
+        <div class="theme-section">
+          <div class="theme-group-label">Light</div>
+          <div id="theme-grid-light" class="theme-grid"></div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-header"><span>Font</span></div>
+          <div id="font-grid" class="font-grid"></div>
+        </div>
+
+        <label class="settings-field">
+          <span>Font size</span>
+          <input type="number" id="setting-fontsize" min="8" max="32" />
+        </label>
+      </div>
+
+      <div class="settings-tab-panel" data-tab-panel="shortcuts">
+        <div class="settings-section-header">
+          <span>Keyboard Shortcuts</span>
+          <button type="button" id="shortcuts-reset-all" class="settings-link-btn">Reset all</button>
+        </div>
+        <p class="settings-hint">Click a shortcut, then press the new key combo (must include Ctrl and/or Alt).</p>
+        <div id="shortcuts-list" class="shortcuts-list"></div>
+      </div>
+
+      <div class="settings-actions">
+        <button id="settings-cancel" class="settings-btn primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="vendor/addon-webgl.js"></script>
+  <script src="tauri-shim.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
