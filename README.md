@@ -5,9 +5,6 @@ A fast, lightweight, native terminal emulator for Windows, built with [Tauri](ht
 ![platform](https://img.shields.io/badge/platform-Windows-blue)
 ![built with](https://img.shields.io/badge/built%20with-Tauri%202%20%2B%20Rust-orange)
 
-## Why xBow
-
-Most modern terminal apps ship an entire Chromium + Node.js runtime just to render text and manage a shell process. xBow uses Tauri's native WebView instead, so the whole app is a small, fast native binary — the UI is still HTML/CSS/JS (rendered with [xterm.js](https://xtermjs.org/)), but the backend (PTY handling, window management, settings) is plain Rust.
 
 ## Features
 
