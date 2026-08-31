@@ -90,9 +90,9 @@ xbow/
 xBow currently targets **Windows** (PowerShell, cmd, and WSL are the supported shells, and the release profile/window controls are Windows-oriented). Linux/macOS support is not implemented yet, though the Rust/`portable-pty` core is cross-platform-friendly and contributions are welcome.
 
 ## Shoutouts
-- xBow's UI is derived from [promptpad](https://github.com/raminturne/promptpad) by [raminturne](https://github.com/raminturne).
-and [iTerm2](https://iterm2.com).
 - The idea was inspired by [iTerm2](https://iterm2.com).
+- xBow's UI is derived from [promptpad](https://github.com/raminturne/promptpad) by [raminturne](https://github.com/raminturne).
+
 
 ## Contributing
 
