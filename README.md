@@ -23,33 +23,6 @@ Most modern terminal apps ship an entire Chromium + Node.js runtime just to rend
 - **Persistent settings** — default shell, theme, font, and key bindings are saved between sessions
 - **Custom titlebar** with native-feeling window controls (minimize/maximize/close)
 
-## Tech stack
-
-| Layer | Technology |
-|---|---|
-| Shell / runtime | [Tauri 2](https://tauri.app) (Rust) |
-| Terminal rendering | [xterm.js](https://xtermjs.org/) (with `addon-fit` and `addon-webgl`) |
-| PTY handling | [`portable-pty`](https://crates.io/crates/portable-pty) |
-| Frontend | Vanilla HTML/CSS/JavaScript (no framework, no bundler) |
-
-## Project structure
-
-```
-xbow/
-├── renderer/              # Frontend (the UI you see)
-│   ├── index.html
-│   ├── renderer.js        # App logic: tabs, panes, themes, shortcuts, settings UI
-│   ├── styles.css
-│   ├── tauri-shim.js       # Bridges the frontend to Tauri's IPC commands
-│   └── vendor/             # xterm.js and its addons
-└── src-tauri/              # Rust backend
-    ├── src/main.rs          # PTY lifecycle, window controls, settings persistence
-    ├── Cargo.toml
-    ├── tauri.conf.json
-    ├── capabilities/
-    └── icons/
-```
-
 ## Getting started
 
 ### Prerequisites
@@ -76,6 +49,33 @@ cargo tauri build
 ```
 
 The installer (NSIS) and the standalone executable will be generated under `src-tauri/target/release/`.
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Shell / runtime | [Tauri 2](https://tauri.app) (Rust) |
+| Terminal rendering | [xterm.js](https://xtermjs.org/) (with `addon-fit` and `addon-webgl`) |
+| PTY handling | [`portable-pty`](https://crates.io/crates/portable-pty) |
+| Frontend | Vanilla HTML/CSS/JavaScript (no framework, no bundler) |
+
+## Project structure
+
+```
+xbow/
+├── renderer/              # Frontend (the UI you see)
+│   ├── index.html
+│   ├── renderer.js        # App logic: tabs, panes, themes, shortcuts, settings UI
+│   ├── styles.css
+│   ├── tauri-shim.js       # Bridges the frontend to Tauri's IPC commands
+│   └── vendor/             # xterm.js and its addons
+└── src-tauri/              # Rust backend
+    ├── src/main.rs          # PTY lifecycle, window controls, settings persistence
+    ├── Cargo.toml
+    ├── tauri.conf.json
+    ├── capabilities/
+    └── icons/
+```
 
 ## Platform support
 
