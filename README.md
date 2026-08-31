@@ -92,7 +92,3 @@ xBow currently targets **Windows** (PowerShell, cmd, and WSL are the supported s
 ## Contributing
 
 Issues and pull requests are welcome. If you're proposing a larger change (a new shell backend, a new platform target, etc.), please open an issue first to discuss the approach.
-
-## License
-
-No license has been specified yet. Add a `LICENSE` file (MIT, Apache-2.0, etc.) before treating this as open source.
