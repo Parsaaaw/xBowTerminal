@@ -50,8 +50,8 @@ cargo tauri build
 
 The installer (NSIS) and the standalone executable will be generated under `src-tauri/target/release/`.
 
-![xBow screenshot](Screenshot-Normal.png)
-![xBow screenshot](Screenshot-FocusMode.png)
+![xBow screenshot](ScreenShots/Screenshot-Normal.png)
+![xBow screenshot](ScreenShots/Screenshot-FocusMode.png)
 
 
 ## Tech stack
