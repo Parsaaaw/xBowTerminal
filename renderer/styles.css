@@ -368,6 +368,80 @@ body.focus-mode #panes { top: 34px; }
 }
 .settings-btn.primary:hover { background: var(--accent-hover); }
 
+/* ---------------- toggle rows (General tab) ---------------- */
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.settings-toggle-row + .settings-toggle-row {
+  border-top: 1px solid var(--border-1);
+}
+.settings-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-toggle-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.settings-toggle-desc {
+  font-size: 11px;
+  color: var(--text-4);
+  line-height: 1.4;
+}
+
+.settings-switch {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.settings-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.settings-switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-0);
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.settings-switch-track::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-3);
+  border-radius: 50%;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.settings-switch input:checked + .settings-switch-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.settings-switch input:checked + .settings-switch-track::before {
+  background: var(--accent-text);
+  transform: translateX(16px);
+}
+.settings-switch input:focus-visible + .settings-switch-track {
+  box-shadow: 0 0 0 2px var(--bg-3), 0 0 0 4px var(--border-3);
+}
+
 /* ---------------- themed scrollbars ---------------- */
 /* Without this, scrollable panels (the settings modal, the shortcuts list)
    fall back to the OS/WebView default scrollbar, which on Windows renders

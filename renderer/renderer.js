@@ -790,6 +790,8 @@ const DEFAULT_SETTINGS = {
   fontFamily: "jetbrains",
   fontSize: 13,
   keyBindings: { ...DEFAULT_KEYBINDINGS },
+  launchAtStartup: false,
+  closeToTray: false,
 };
 
 let settings = { ...DEFAULT_SETTINGS };
@@ -1110,7 +1112,7 @@ function updateHasSplitsClass(tab) {
 // Creates the terminal instance for a pane and wires it up exactly like the
 // old single-terminal-per-tab createTab() used to, just parameterized over
 // which tab/pane/DOM leaf it belongs to.
-function spawnTerminalInLeaf(tab, paneId, shell, leafEl, container) {
+function spawnTerminalInLeaf(tab, paneId, shell, leafEl, container, cwd) {
   const term = new Terminal({
     cursorBlink: true,
     fontFamily: (FONTS[settings.fontFamily] || FONTS.jetbrains).stack,
@@ -1153,7 +1155,7 @@ function spawnTerminalInLeaf(tab, paneId, shell, leafEl, container) {
 
   requestAnimationFrame(async () => {
     fitAddon.fit();
-    await window.api.create(paneId, shell, term.cols, term.rows);
+    await window.api.create(paneId, shell, term.cols, term.rows, cwd);
   });
 
   return pane;
@@ -1597,7 +1599,7 @@ tabsEl.addEventListener("drop", (e) => {
   if (tabsEl.querySelector(".tab.dragging")) e.preventDefault();
 });
 
-function createTab(shell) {
+function createTab(shell, cwd) {
   const tabId = genId();
 
   // --- tab button ---
@@ -1649,7 +1651,7 @@ function createTab(shell) {
   const tab = { id: tabId, tabEl, rootEl, panes: new Map(), activePaneId: paneId, shell, customName: null, zoomedPaneId: null };
   tabs.set(tabId, tab);
 
-  spawnTerminalInLeaf(tab, paneId, shell, leaf, container);
+  spawnTerminalInLeaf(tab, paneId, shell, leaf, container, cwd);
   tab.activePaneId = paneId;
 
   switchToTab(tabId);
@@ -1695,6 +1697,15 @@ function closeTabById(tabId) {
 window.api.onData(({ id, data }) => {
   const pane = panesById.get(id);
   if (pane) pane.term.write(data);
+});
+
+// Fired when xBow is already running and a folder gets "Open xBow"'d again
+// from Explorer - see tauri-plugin-single-instance's callback in main.rs,
+// which relays the new launch's folder here instead of it opening a second
+// window. A closed app instead picks the folder up itself at boot, via
+// getInitialPath() below.
+window.api.onOpenInFolder((path) => {
+  if (path) createTab(settings.defaultShell, path);
 });
 window.api.onExit(({ id }) => {
   const pane = panesById.get(id);
@@ -1875,6 +1886,8 @@ document.getElementById("search-close").addEventListener("click", closeSearchBar
 const settingsOverlay = document.getElementById("settings-overlay");
 const settingsShellSel = document.getElementById("setting-shell");
 const settingsFontSizeInput = document.getElementById("setting-fontsize");
+const settingsLaunchAtStartup = document.getElementById("setting-launch-at-startup");
+const settingsCloseToTray = document.getElementById("setting-close-to-tray");
 const shortcutsListEl = document.getElementById("shortcuts-list");
 const shortcutsResetAllBtn = document.getElementById("shortcuts-reset-all");
 const themeGridDarkEl = document.getElementById("theme-grid-dark");
@@ -1901,6 +1914,8 @@ async function commitSettings() {
       Math.min(32, parseInt(settingsFontSizeInput.value, 10) || DEFAULT_SETTINGS.fontSize)
     ),
     keyBindings: { ...pendingKeyBindings },
+    launchAtStartup: settingsLaunchAtStartup.checked,
+    closeToTray: settingsCloseToTray.checked,
   };
   applyAppearance();
   await window.api.setSettings(settings);
@@ -2101,6 +2116,8 @@ document.querySelectorAll(".settings-tab-btn").forEach((btn) => {
 function populateSettingsForm() {
   settingsShellSel.value = settings.defaultShell;
   settingsFontSizeInput.value = settings.fontSize;
+  settingsLaunchAtStartup.checked = !!settings.launchAtStartup;
+  settingsCloseToTray.checked = !!settings.closeToTray;
 
   pendingTheme = settings.theme;
   pendingFont = settings.fontFamily;
@@ -2139,6 +2156,8 @@ settingsFontSizeInput.addEventListener("input", previewAppearance);
 settingsFontSizeInput.addEventListener("change", commitSettings);
 
 settingsShellSel.addEventListener("change", commitSettings);
+settingsLaunchAtStartup.addEventListener("change", commitSettings);
+settingsCloseToTray.addEventListener("change", commitSettings);
 
 /* ---------------- command palette ---------------- */
 
@@ -2337,5 +2356,12 @@ paletteOverlay.addEventListener("click", (e) => {
   // falls back to that action's default instead of leaving it unbound.
   settings.keyBindings = { ...DEFAULT_KEYBINDINGS, ...(settings.keyBindings || {}) };
   applyChrome(settings.theme);
-  createTab(settings.defaultShell);
+
+  let initialPath = null;
+  try {
+    initialPath = await window.api.getInitialPath();
+  } catch (_) {
+    // No CLI/context-menu folder for this launch - normal startup.
+  }
+  createTab(settings.defaultShell, initialPath || undefined);
 })();

@@ -26,7 +26,10 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, Window};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 struct PtyEntry {
     writer: Box<dyn Write + Send>,
@@ -35,6 +38,25 @@ struct PtyEntry {
 
 struct AppState {
     ptys: Mutex<HashMap<String, PtyEntry>>,
+    // Set right before the tray's "Quit" item forces a real exit, so the
+    // CloseRequested handler below knows to let it through instead of
+    // reinterpreting it as an ordinary close-to-tray click.
+    quitting: Mutex<bool>,
+    // Folder path this process was launched with (from Explorer's "Open
+    // xBow" / "Open xBow here" context menu, or a plain `xbow.exe <path>`
+    // launch). Consumed once by get_initial_path() so the frontend opens
+    // its very first tab there instead of the home directory.
+    initial_path: Mutex<Option<String>>,
+}
+
+// Picks the first CLI argument that's an existing directory - used both for
+// this process's own startup args and for a second instance's args relayed
+// through the single-instance plugin below. Skips argv[0] (the exe path).
+fn find_folder_arg<'a, I: IntoIterator<Item = &'a String>>(args: I) -> Option<String> {
+    args.into_iter()
+        .skip(1)
+        .find(|a| std::path::Path::new(a).is_dir())
+        .cloned()
 }
 
 #[derive(Serialize, Clone)]
@@ -79,6 +101,7 @@ fn pty_create(
     shell: String,
     cols: u16,
     rows: u16,
+    cwd: Option<String>,
 ) -> Result<(), String> {
     let pty_system = native_pty_system();
     let pair = pty_system
@@ -93,8 +116,14 @@ fn pty_create(
     let (file, args) = shell_config(&shell);
     let mut cmd = CommandBuilder::new(file);
     cmd.args(args);
-    if let Some(home) = dirs_next::home_dir() {
-        cmd.cwd(home);
+    // Folder passed from Explorer's "Open xBow" context menu (or the
+    // single-instance relay below) wins; otherwise fall back to $HOME like
+    // before.
+    let dir = cwd
+        .filter(|d| std::path::Path::new(d).is_dir())
+        .or_else(|| dirs_next::home_dir().map(|p| p.to_string_lossy().into_owned()));
+    if let Some(dir) = dir {
+        cmd.cwd(dir);
     }
 
     let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
@@ -242,6 +271,15 @@ struct Settings {
     font_size: u32,
     #[serde(default = "default_key_bindings")]
     key_bindings: HashMap<String, String>,
+    // Both added for the General tab's two new toggles. #[serde(default)]
+    // (defaulting to bool's own false) matters for upgrades, same reason as
+    // key_bindings above: settings.json files written before these fields
+    // existed have neither key, and without a default serde would fail to
+    // deserialize the whole file.
+    #[serde(default)]
+    launch_at_startup: bool,
+    #[serde(default)]
+    close_to_tray: bool,
 }
 
 impl Default for Settings {
@@ -252,6 +290,8 @@ impl Default for Settings {
             font_family: "jetbrains".into(),
             font_size: 13,
             key_bindings: default_key_bindings(),
+            launch_at_startup: false,
+            close_to_tray: false,
         }
     }
 }
@@ -262,13 +302,20 @@ fn settings_path(app: &AppHandle) -> std::path::PathBuf {
     dir.join("settings.json")
 }
 
-#[tauri::command]
-fn settings_get(app: AppHandle) -> Settings {
-    let path = settings_path(&app);
+// Shared by the settings_get command and the CloseRequested handler below,
+// which needs to know the current close_to_tray value without going through
+// invoke().
+fn load_settings(app: &AppHandle) -> Settings {
+    let path = settings_path(app);
     std::fs::read_to_string(path)
         .ok()
         .and_then(|raw| serde_json::from_str(&raw).ok())
         .unwrap_or_default()
+}
+
+#[tauri::command]
+fn settings_get(app: AppHandle) -> Settings {
+    load_settings(&app)
 }
 
 #[tauri::command]
@@ -277,14 +324,107 @@ fn settings_set(app: AppHandle, settings: Settings) -> Settings {
     if let Ok(json) = serde_json::to_string_pretty(&settings) {
         let _ = std::fs::write(path, json);
     }
+
+    // Keep the OS-level autostart registration in sync with the toggle
+    // every time settings are saved, rather than requiring a separate
+    // command from the frontend.
+    let autolaunch = app.autolaunch();
+    let is_enabled = autolaunch.is_enabled().unwrap_or(false);
+    if settings.launch_at_startup && !is_enabled {
+        let _ = autolaunch.enable();
+    } else if !settings.launch_at_startup && is_enabled {
+        let _ = autolaunch.disable();
+    }
+
     settings
 }
 
+#[tauri::command]
+fn get_initial_path(state: State<AppState>) -> Option<String> {
+    // .take() so a page reload (or a second call for any reason) doesn't
+    // reopen the same startup folder again - it's a one-shot "how was this
+    // process launched" signal, not a persistent setting.
+    state.initial_path.lock().unwrap().take()
+}
+
 fn main() {
+    let initial_path = find_folder_arg(&std::env::args().collect::<Vec<_>>());
+
     tauri::Builder::default()
+        // Must be registered before any other plugin (per its own docs): a
+        // second `xbow.exe <folder>` launch - e.g. from Explorer's context
+        // menu while xBow is already running - never reaches the rest of
+        // this file. Instead this callback fires in the *existing* process
+        // with the new launch's argv, and the second process exits on its
+        // own right after.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(path) = find_folder_arg(&argv) {
+                let _ = app.emit("open-in-folder", path);
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(AppState { ptys: Mutex::new(HashMap::new()) })
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .manage(AppState {
+            ptys: Mutex::new(HashMap::new()),
+            quitting: Mutex::new(false),
+            initial_path: Mutex::new(initial_path),
+        })
+        .setup(|app| {
+            // Tray icon + right-click menu, needed for the "Close to tray"
+            // setting: once the window is hidden instead of closed, this is
+            // the only way left to bring it back or actually quit.
+            let show_item = MenuItem::with_id(app, "show", "Open xBow", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            let mut tray_builder = TrayIconBuilder::new()
+                .tooltip("xBow")
+                .menu(&tray_menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        if let Some(state) = app.try_state::<AppState>() {
+                            *state.quitting.lock().unwrap() = true;
+                            // Same pty cleanup the normal close path does -
+                            // app.exit() below skips CloseRequested entirely.
+                            state.ptys.lock().unwrap().clear();
+                        }
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            }
+            tray_builder.build(app)?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             pty_create,
             pty_input,
@@ -296,12 +436,30 @@ fn main() {
             win_close,
             settings_get,
             settings_set,
+            get_initial_path,
         ])
         .on_window_event(|window, event| {
-            // Equivalent of main.js's window-all-closed handler: kill every
-            // live pty so no orphaned shell processes are left running.
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                if let Some(state) = window.app_handle().try_state::<AppState>() {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let app_handle = window.app_handle();
+
+                // "Quit" from the tray sets this right before calling
+                // app.exit(), so a real quit is never reinterpreted as a
+                // close-to-tray click even when close_to_tray is on.
+                let quitting = app_handle
+                    .try_state::<AppState>()
+                    .map(|s| *s.quitting.lock().unwrap())
+                    .unwrap_or(false);
+
+                if !quitting && load_settings(app_handle).close_to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    return;
+                }
+
+                // Equivalent of main.js's window-all-closed handler: kill
+                // every live pty so no orphaned shell processes are left
+                // running.
+                if let Some(state) = app_handle.try_state::<AppState>() {
                     state.ptys.lock().unwrap().clear();
                 }
             }

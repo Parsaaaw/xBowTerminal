@@ -13,7 +13,6 @@ A fast, lightweight, native terminal emulator for Windows, built with [Tauri](ht
 - **Tabs** — each tab can hold a single terminal or a tree of split panes
 - **Command palette** — quick access to every action (`Ctrl+Shift+P`)
 - **Scrollback search** — search within a pane's output (`Ctrl+Shift+F`)
-- **10 built-in themes** — including Dark (default), macOS Pro, macOS Basic (Light), Dracula, Monokai, Gruvbox Dark, Catppuccin Mocha, Ayu Dark, Everforest Dark, and Iceberg Dark
 - **Font choice** — JetBrains Mono, Fira Code, Cascadia Code, Consolas, Menlo/Monaco/SF Mono (macOS-style), and more, with adjustable font size
 - **Fully rebindable keyboard shortcuts** for every action (new tab, split, close pane, navigate/resize panes, copy, zoom pane, etc.)
 - **UTF-8 by default** — shells are launched with the correct codepage/encoding out of the box, so non-Latin text (e.g. Persian, Arabic, CJK) renders correctly instead of coming out garbled

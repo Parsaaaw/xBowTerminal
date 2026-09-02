@@ -9,7 +9,7 @@
   const { writeText, readText } = window.__TAURI__.clipboardManager;
 
   window.api = {
-    create: (id, shell, cols, rows) => invoke("pty_create", { id, shell, cols, rows }),
+    create: (id, shell, cols, rows, cwd) => invoke("pty_create", { id, shell, cols, rows, cwd }),
     input: (id, data) => invoke("pty_input", { id, data }),
     resize: (id, cols, rows) => invoke("pty_resize", { id, cols, rows }),
     kill: (id) => invoke("pty_kill", { id }),
@@ -26,6 +26,16 @@
     // unchanged on the wire.
     getSettings: () => invoke("settings_get"),
     setSettings: (settings) => invoke("settings_set", { settings }),
+
+    // Folder this process itself was launched with, e.g. via Explorer's
+    // "Open xBow" context menu. Only meaningful once, right after boot -
+    // Rust clears it after the first read.
+    getInitialPath: () => invoke("get_initial_path"),
+    // Fires when a *second* xbow.exe launch (same context menu, but while
+    // xBow is already running) gets relayed into this instance instead of
+    // opening a duplicate window - see tauri-plugin-single-instance in
+    // main.rs.
+    onOpenInFolder: (cb) => listen("open-in-folder", (event) => cb(event.payload)),
 
     clipboardWriteText: (text) => writeText(text || ""),
     clipboardReadText: () => readText(),

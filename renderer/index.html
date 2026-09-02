@@ -73,6 +73,33 @@
             <option value="wsl">WSL</option>
           </select>
         </label>
+
+        <div class="settings-section">
+          <div class="settings-section-header"><span>System</span></div>
+
+          <label class="settings-toggle-row">
+            <div class="settings-toggle-text">
+              <span class="settings-toggle-title">Launch at startup</span>
+              <span class="settings-toggle-desc">Open xBow when Windows starts</span>
+            </div>
+            <span class="settings-switch">
+              <input type="checkbox" id="setting-launch-at-startup" />
+              <span class="settings-switch-track"></span>
+            </span>
+          </label>
+
+          <label class="settings-toggle-row">
+            <div class="settings-toggle-text">
+              <span class="settings-toggle-title">Close to tray</span>
+              <span class="settings-toggle-desc">Keep running in the tray when closed</span>
+            </div>
+            <span class="settings-switch">
+              <input type="checkbox" id="setting-close-to-tray" />
+              <span class="settings-switch-track"></span>
+            </span>
+          </label>
+        </div>
+
         <p class="settings-hint">Double-click a tab to rename it, drag tabs to reorder, and middle-click a terminal to paste from the clipboard.</p>
       </div>
 

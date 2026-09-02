@@ -27,6 +27,11 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "icon": ["icons/xbow-icon.png"]
+    "icon": ["icons/xbow-icon.png"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer.nsh"
+      }
+    }
   }
 }
