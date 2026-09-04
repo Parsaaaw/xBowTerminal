@@ -339,6 +339,46 @@ body.focus-mode #panes { top: 34px; }
   padding: 6px 8px;
   font-size: 12px;
 }
+.settings-field-value {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.settings-field input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.settings-field input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-2);
+}
+.settings-field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: -5px;
+  cursor: pointer;
+}
+.settings-field input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-2);
+}
+.settings-field input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
 .settings-hint {
   font-size: 11px;
   color: var(--text-4);

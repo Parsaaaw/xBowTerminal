@@ -789,6 +789,10 @@ const DEFAULT_SETTINGS = {
   theme: "dark",
   fontFamily: "jetbrains",
   fontSize: 13,
+  // Percentage (10-100). xterm.js's own default behaves like ~30% for any
+  // opaque theme color (see themeForShell), so that's the default here too
+  // - existing users won't see a jump until they raise it themselves.
+  selectionOpacity: 30,
   keyBindings: { ...DEFAULT_KEYBINDINGS },
   launchAtStartup: false,
   closeToTray: false,
@@ -831,11 +835,50 @@ function genId() {
 
 /* ---------------- theme/font application ---------------- */
 
-function themeForShell(shell, themeKey) {
-  const base = (THEMES[themeKey] || THEMES.dark).colors;
+// Converts a "#rrggbb"/"#rgb" hex color into an [r, g, b] array.
+function hexToRgbArr(hex) {
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const num = parseInt(h, 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+// Linear-interpolates between two hex colors at t (0 = hexA, 1 = hexB).
+function blendHex(hexA, hexB, t) {
+  const a = hexToRgbArr(hexA);
+  const b = hexToRgbArr(hexB);
+  return a.map((v, i) => Math.round(v + (b[i] - v) * t));
+}
+
+// Each theme's own `colors.selectionBackground` swatch is what xterm.js
+// paints selected text on top of - but those hand-picked hex values vary
+// wildly in how visible they actually are (e.g. Mono's "#1e1e1e" on a
+// "#0a0a0a" background is barely a shade different, so cranking opacity on
+// it alone still looks faint). Blending from the theme's own background up
+// toward its `chrome.accent` instead - the color already curated per theme
+// for strong visibility - gives a consistently strong, controllable result
+// no matter which theme is active, rather than being at the mercy of each
+// theme's specific selectionBackground pick.
+//
+// The blend is capped short of the full accent color (see MAX_BLEND) so
+// text keeps standing out against the highlight even at 100%, and it's
+// always emitted as rgba() with alpha just under 1 because xterm.js
+// otherwise silently forces any *fully opaque* selection color down to a
+// hardcoded 30% alpha (see its ThemeService._setTheme) - which is what
+// made every theme's selection look washed out in the first place.
+const MIN_BLEND = 0.15;
+const MAX_BLEND = 0.85;
+function themeForShell(shell, themeKey, opacityPercent) {
+  const theme = THEMES[themeKey] || THEMES.dark;
+  const base = theme.colors;
+  const opacity = opacityPercent ?? settings.selectionOpacity ?? DEFAULT_SETTINGS.selectionOpacity;
+  const pct = Math.min(100, Math.max(10, opacity)) / 100;
+  const t = MIN_BLEND + pct * (MAX_BLEND - MIN_BLEND);
+  const [r, g, b] = blendHex(base.background, theme.chrome.accent, t);
   return {
     ...base,
     cursor: base.cursor || SHELL_META[shell].accent,
+    selectionBackground: `rgba(${r}, ${g}, ${b}, 0.98)`,
   };
 }
 
@@ -1886,6 +1929,8 @@ document.getElementById("search-close").addEventListener("click", closeSearchBar
 const settingsOverlay = document.getElementById("settings-overlay");
 const settingsShellSel = document.getElementById("setting-shell");
 const settingsFontSizeInput = document.getElementById("setting-fontsize");
+const settingsSelectionOpacityInput = document.getElementById("setting-selection-opacity");
+const settingsSelectionOpacityValue = document.getElementById("setting-selection-opacity-value");
 const settingsLaunchAtStartup = document.getElementById("setting-launch-at-startup");
 const settingsCloseToTray = document.getElementById("setting-close-to-tray");
 const shortcutsListEl = document.getElementById("shortcuts-list");
@@ -1913,6 +1958,10 @@ async function commitSettings() {
       8,
       Math.min(32, parseInt(settingsFontSizeInput.value, 10) || DEFAULT_SETTINGS.fontSize)
     ),
+    selectionOpacity: Math.max(
+      10,
+      Math.min(100, parseInt(settingsSelectionOpacityInput.value, 10) || DEFAULT_SETTINGS.selectionOpacity)
+    ),
     keyBindings: { ...pendingKeyBindings },
     launchAtStartup: settingsLaunchAtStartup.checked,
     closeToTray: settingsCloseToTray.checked,
@@ -1931,8 +1980,13 @@ function previewAppearance() {
     8,
     Math.min(32, parseInt(settingsFontSizeInput.value, 10) || settings.fontSize)
   );
+  const previewOpacity = Math.max(
+    10,
+    Math.min(100, parseInt(settingsSelectionOpacityInput.value, 10) || settings.selectionOpacity)
+  );
+  if (settingsSelectionOpacityValue) settingsSelectionOpacityValue.textContent = `${previewOpacity}%`;
   for (const pane of panesById.values()) {
-    pane.term.options.theme = themeForShell(pane.shell, pendingTheme);
+    pane.term.options.theme = themeForShell(pane.shell, pendingTheme, previewOpacity);
     pane.term.options.fontFamily = fontStack;
     pane.term.options.fontSize = previewSize;
     if (pane.tabId === activeTabId) {
@@ -2116,6 +2170,8 @@ document.querySelectorAll(".settings-tab-btn").forEach((btn) => {
 function populateSettingsForm() {
   settingsShellSel.value = settings.defaultShell;
   settingsFontSizeInput.value = settings.fontSize;
+  settingsSelectionOpacityInput.value = settings.selectionOpacity;
+  if (settingsSelectionOpacityValue) settingsSelectionOpacityValue.textContent = `${settings.selectionOpacity}%`;
   settingsLaunchAtStartup.checked = !!settings.launchAtStartup;
   settingsCloseToTray.checked = !!settings.closeToTray;
 
@@ -2154,6 +2210,9 @@ settingsOverlay.addEventListener("click", (e) => {
 // so typing "13" doesn't fire a save for the intermediate "1".
 settingsFontSizeInput.addEventListener("input", previewAppearance);
 settingsFontSizeInput.addEventListener("change", commitSettings);
+
+settingsSelectionOpacityInput.addEventListener("input", previewAppearance);
+settingsSelectionOpacityInput.addEventListener("change", commitSettings);
 
 settingsShellSel.addEventListener("change", commitSettings);
 settingsLaunchAtStartup.addEventListener("change", commitSettings);
