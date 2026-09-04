@@ -280,6 +280,19 @@ struct Settings {
     launch_at_startup: bool,
     #[serde(default)]
     close_to_tray: bool,
+    // Added for the Appearance tab's "Selection opacity" slider. Without
+    // #[serde(default = ...)] here, this struct has no field to hold the
+    // value at all: settings_set deserializes the JS object straight into
+    // Settings (silently dropping any key the struct doesn't declare) and
+    // then re-serializes *that struct* to disk, so selectionOpacity was
+    // never actually persisted to settings.json - every relaunch read it
+    // back as whatever the frontend's own DEFAULT_SETTINGS fallback is (30).
+    #[serde(default = "default_selection_opacity")]
+    selection_opacity: u32,
+}
+
+fn default_selection_opacity() -> u32 {
+    30
 }
 
 impl Default for Settings {
@@ -292,6 +305,7 @@ impl Default for Settings {
             key_bindings: default_key_bindings(),
             launch_at_startup: false,
             close_to_tray: false,
+            selection_opacity: default_selection_opacity(),
         }
     }
 }
